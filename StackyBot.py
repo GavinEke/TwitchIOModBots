@@ -29,8 +29,6 @@ class Twitch(discord_commands.Cog):
         self.bot.listen("event_ready")(self.event_ready)
         self.bot.listen("event_message")(self.event_message)
         self.bot.listen("event_raw_usernotice")(self.event_raw_usernotice)
-        self.bot.listen("event_join")(self.event_join)
-        self.bot.listen("event_part")(self.event_part)
         self.bot.listen("event_clearchat")(self.event_clearchat)
         self.bot.command(name='ping', aliases=['test'])(self._twitchpingcmd)
 
@@ -119,18 +117,6 @@ class Twitch(discord_commands.Cog):
             await discord_channel.send(embed=embed)
             await channel.send(f"!hype")
 
-    # TwitchIO event_join
-    async def event_join(self, ctx):
-        'Runs every time when a JOIN is received from Twitch'
-        dtnow = datetime.now(pytz.timezone('Australia/Brisbane')).strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{dtnow}] {ctx.name} JOINED chat")
-
-    # TwitchIO event_part
-    async def event_part(self, ctx):
-        'Runs every time when a PART is received from Twitch'
-        dtnow = datetime.now(pytz.timezone('Australia/Brisbane')).strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{dtnow}] {ctx.name} LEFT chat")
-
     # TwitchIO event_clearchat
     async def event_clearchat(self, notice):
         'Runs every time a user banned, timed out or a message is deleted'
@@ -140,8 +126,9 @@ class Twitch(discord_commands.Cog):
     # TwitchIO command
     async def _twitchpingcmd(self, ctx):
         'Runs the twitch command !ping'
-        print(f"Pong!")
-        await ctx.send('Pong!')
+        if ctx.author.is_mod:
+            print(f"Pong!")
+            await ctx.send('Pong!')
 
     # Discord.py event on_ready
     @discord_commands.Cog.listener()
@@ -152,7 +139,6 @@ class Twitch(discord_commands.Cog):
     @discord_commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         'Runs every time a member joins or leaves a voice channel'
-        print(f"{member} changed voice state")
         wp_textchat_role = discord.utils.get(member.guild.roles, id=836106960746446858) # Watch Party
         vc_textchat_role = discord.utils.get(member.guild.roles, id=836108179976093737) # Voice Channels
         if before.channel is not None:
@@ -172,6 +158,7 @@ class Twitch(discord_commands.Cog):
 
     # Discord.py command
     @discord_commands.command(name='ping', aliases=['test'])
+    @discord_commands.has_any_role(675659809285996552, 675658619240448041, 742308637816520764)
     async def _discordpingcmd(self, ctx):
         'Runs the discord command ?ping'
         print(f"Pong!")
@@ -179,6 +166,8 @@ class Twitch(discord_commands.Cog):
 
     # Discord.py command
     @discord_commands.command(name='setemojirole')
+    @discord_commands.has_permissions(manage_emojis=True)
+    @discord_commands.bot_has_permissions(manage_emojis=True)
     async def _setemojirole(self, ctx: discord_commands.Context, emoji: discord.Emoji, *roles: discord.Role):
         """
         Creates the discord command ?setemojirole to change the permissions of which roles can use an emoji
@@ -197,6 +186,11 @@ class Twitch(discord_commands.Cog):
         embed = discord.Embed(color=0xff7b00)
         embed.add_field(name="Set Emoji Role", value=f"The emoji **{emoji}** may now only be used by the following roles **{roles}**", inline=False)
         await ctx.send(embed=embed)
+
+    @_setemojirole.error
+    async def _setemojirole_error(self, ctx, error):
+        if isinstance(error, discord_commands.MissingPermissions):
+            await self.discord_bot.send_message(ctx.message.channel, f"Sorry {ctx.message.author}, you do not have permissions to do that!")
 
 if __name__ == "__main__":
     discord_bot.add_cog(Twitch(discord_bot))
