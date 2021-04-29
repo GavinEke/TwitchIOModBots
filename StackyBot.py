@@ -1,9 +1,12 @@
+#! python3
+
 import os
 from datetime import datetime
 import pytz
 import discord
 from discord.ext import commands as discord_commands
 from twitchio.ext import commands
+from imdb import IMDb
 from dotenv import load_dotenv
 
 # load secrets
@@ -30,7 +33,6 @@ class Twitch(discord_commands.Cog):
         self.bot.listen("event_message")(self.event_message)
         self.bot.listen("event_raw_usernotice")(self.event_raw_usernotice)
         self.bot.listen("event_clearchat")(self.event_clearchat)
-        self.bot.command(name='ping', aliases=['test'])(self._twitchpingcmd)
 
     # TwitchIO event_message
     async def event_ready(self):
@@ -62,9 +64,6 @@ class Twitch(discord_commands.Cog):
             await discord_channel.send(embed=embed)
             if int(cheerAmount) >= 1000: # Runs only if the bit donation is 1000 or more
                 await message.channel.send(f"!hype")
-
-        if "stacey" in message.content.lower() and message.author.name.lower() != self.bot.nick:
-            await message.channel.send(f"@{message.author.display_name} who the f is stacey? there is only Stacy here")
 
     # TwitchIO event_raw_usernotice
     async def event_raw_usernotice(self, channel, tags):
@@ -123,13 +122,6 @@ class Twitch(discord_commands.Cog):
         discord_channel = self.discord_bot.get_channel(836112934676594699)
         await discord_channel.send(f"> **{notice.user.name}** got banned, timed out or a message is deleted")
 
-    # TwitchIO command
-    async def _twitchpingcmd(self, ctx):
-        'Runs the twitch command !ping'
-        if ctx.author.is_mod:
-            print(f"Pong!")
-            await ctx.send('Pong!')
-
     # Discord.py event on_ready
     @discord_commands.Cog.listener()
     async def on_ready(self):
@@ -157,20 +149,12 @@ class Twitch(discord_commands.Cog):
                 print(f"{member} added to VC_textchat role")
 
     # Discord.py command
-    @discord_commands.command(name='ping', aliases=['test'])
-    @discord_commands.has_any_role(675659809285996552, 675658619240448041, 742308637816520764)
-    async def _discordpingcmd(self, ctx):
-        'Runs the discord command ?ping'
-        print(f"Pong!")
-        await ctx.send('Pong!')
-
-    # Discord.py command
     @discord_commands.command(name='setemojirole')
     @discord_commands.has_permissions(manage_emojis=True)
     @discord_commands.bot_has_permissions(manage_emojis=True)
     async def _setemojirole(self, ctx: discord_commands.Context, emoji: discord.Emoji, *roles: discord.Role):
         """
-        Creates the discord command ?setemojirole to change the permissions of which roles can use an emoji
+        Runs the discord command ?setemojirole to change the permissions of which roles can use an emoji
 
         Example 1:
         ?setemojirole :emoji: @role
@@ -192,6 +176,22 @@ class Twitch(discord_commands.Cog):
         if isinstance(error, discord_commands.MissingPermissions):
             await self.discord_bot.send_message(ctx.message.channel, f"Sorry {ctx.message.author}, you do not have permissions to do that!")
 
+    @discord_commands.command(name='imdb', aliases=['movie','show','series'])
+    async def _imdbdiscordcmd(self, ctx):
+        """
+        Runs the discord command ?imdb to get info from IMDB
+
+        Example 1:
+        ?imdb Rush Hour
+        """
+        movie = ia.search_movie(ctx.message.content[len("?imdb"):])
+        ia.update(movie[0], ['technical','plot'])
+        embed=discord.Embed(title=f"{movie[0].data['title']} ({movie[0].data['year']})", description=f"**Runtime:** {movie[0].data['tech']['runtime'][0]}", color=0x9d00a8)
+        embed.set_thumbnail(url=movie[0].data['cover url'])
+        embed.add_field(name="Plot", value=movie[0].data['plot'][0], inline=False)
+        await ctx.send(embed=embed)
+
 if __name__ == "__main__":
+    ia = IMDb()
     discord_bot.add_cog(Twitch(discord_bot))
     discord_bot.run(os.environ['DISCORD_TOKEN'])
